@@ -1,4 +1,7 @@
 .{ .name = "speed-dating", .version = "0.0.0", .dependencies = .{ .zap = .{
     .url = "https://github.com/zigzap/zap/archive/refs/tags/v0.1.14-pre.tar.gz",
     .hash = "122067d12bc7abb93f7ce623f61b94cadfdb180cef12da6559d092e6b374202acda3",
+}, .json = .{
+    .url = "https://github.com/getty-zig/json/archive/b2506def64f963ed34696994b56e2d5c90f73225.tar.gz",
+    .hash = "12200883305eed0252a77febaf855a66c0f8b67753808c34036cbcf972919e998d75",
 } } }

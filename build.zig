@@ -11,6 +11,8 @@ pub fn build(b: *std.Build) !void {
 
     const allocator = gpa.allocator();
 
+    const opts = .{ .target = target, .optimize = optimize };
+
     var modules = ModuleMap.init(allocator);
     defer modules.deinit();
 
@@ -30,6 +32,10 @@ pub fn build(b: *std.Build) !void {
     });
     exe.addModule("zap", zap.module("zap"));
     exe.linkLibrary(zap.artifact("facil.io"));
+
+    // setup json
+    const json_module = b.dependency("json", opts).module("json");
+    exe.addModule("json", json_module);
 
     // setup run
     const run_cmd = b.addRunArtifact(exe);
