@@ -3,7 +3,12 @@ const zap = @import("zap");
 const json = @import("json");
 const types = @import("./types.zig");
 
+var RndGen = std.rand.DefaultPrng.init(0);
 const alloc = std.heap.page_allocator;
+
+const ErrorSD = error{
+    BadRequest,
+};
 
 var market = types.Market{};
 
@@ -32,16 +37,22 @@ fn endpoint_http_api_get(e: *zap.SimpleEndpoint, r: zap.SimpleRequest) void {
                 r.sendJson(market.to_json() catch return) catch return;
             } else if (market_params.len == 4) {
                 const market_id = std.fmt.parseInt(u32, market_params[0], 10) catch return;
+                if (market_id >= market.markets.items.len) {
+                    return r.sendError(ErrorSD.BadRequest, 400);
+                }
                 const is_buy = std.fmt.parseInt(u8, market_params[1], 10) catch return;
                 const quantity = std.fmt.parseInt(u64, market_params[2], 10) catch return;
                 const price = std.fmt.parseInt(u64, market_params[3], 10) catch return;
-                market.add_order(market_id, is_buy == 0, .{ .id = 0, .price = price, .quantity = quantity }) catch return;
+                const order_id = RndGen.random().int(u64);
+                market.add_order(market_id, is_buy == 0, .{ .id = order_id, .price = price, .quantity = quantity }) catch return;
             }
         }
     }
 }
 
 pub fn main() !void {
+    try market.add_orderbook(types.Orderbook{ .id = 0, .base = "A", .quote = "B" });
+
     // setup listener
     var listener = zap.SimpleEndpointListener.init(
         alloc,

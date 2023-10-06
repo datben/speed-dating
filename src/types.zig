@@ -11,6 +11,10 @@ pub const Market = struct {
         return json.toSlice(alloc, self);
     }
 
+    pub fn add_orderbook(self: *Market, orderbook: Orderbook) !void {
+        return self.markets.append(orderbook);
+    }
+
     pub fn add_order(self: Market, m_id: u32, is_buy: bool, order: Order) !void {
         return self.markets.items[m_id].add_order(is_buy, order);
     }
@@ -23,11 +27,11 @@ pub const Orderbook = struct {
     buy: std.ArrayList(Order) = std.ArrayList(Order).init(alloc),
     sell: std.ArrayList(Order) = std.ArrayList(Order).init(alloc),
 
-    pub fn to_json(self: Orderbook) ![]const u8 {
+    pub fn to_json(self: *Orderbook) ![]const u8 {
         return json.toSlice(alloc, self);
     }
 
-    pub fn add_order(self: Orderbook, is_buy: bool, order: Order) !void {
+    pub fn add_order(self: *Orderbook, is_buy: bool, order: Order) !void {
         if (is_buy) {
             return self.buy.append(order);
         } else {
@@ -41,7 +45,7 @@ pub const Order = struct {
     quantity: u64,
     price: u64,
 
-    pub fn random() Order {
+    pub fn default() Order {
         return .{
             .id = 0,
             .quantity = 0,
