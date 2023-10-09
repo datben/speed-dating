@@ -2,6 +2,7 @@ const std = @import("std");
 const zap = @import("zap");
 const json = @import("json");
 const types = @import("./types.zig");
+const Tokens = @import("./types.zig").Tokens;
 
 var RndGen = std.rand.DefaultPrng.init(0);
 const alloc = std.heap.page_allocator;
@@ -40,9 +41,9 @@ fn endpoint_http_api_get(e: *zap.SimpleEndpoint, r: zap.SimpleRequest) void {
                 if (market_id >= market.markets.items.len) {
                     return r.sendError(ErrorSD.BadRequest, 400);
                 }
-                const is_buy = std.fmt.parseInt(u8, market_params[1], 10) catch return;
-                const quantity = std.fmt.parseInt(u64, market_params[2], 10) catch return;
-                const price = std.fmt.parseInt(u64, market_params[3], 10) catch return;
+                const is_buy = std.fmt.parseInt(u8, market_params[1], 10) catch return r.sendError(ErrorSD.BadRequest, 400);
+                const quantity = std.fmt.parseInt(u64, market_params[2], 10) catch return r.sendError(ErrorSD.BadRequest, 400);
+                const price = std.fmt.parseInt(u64, market_params[3], 10) catch return r.sendError(ErrorSD.BadRequest, 400);
                 const order_id = RndGen.random().int(u64);
                 market.add_order(market_id, is_buy == 0, .{ .id = order_id, .price = price, .quantity = quantity }) catch return;
             }
@@ -51,30 +52,40 @@ fn endpoint_http_api_get(e: *zap.SimpleEndpoint, r: zap.SimpleRequest) void {
 }
 
 pub fn main() !void {
-    try market.add_orderbook(types.Orderbook{ .id = 0, .base = "A", .quote = "B" });
+    try market.add_orderbook(types.Orderbook{ .id = 0, .base = Tokens.A, .quote = Tokens.B });
 
-    // setup listener
-    var listener = zap.SimpleEndpointListener.init(
-        alloc,
-        .{
-            .port = 3000,
-            .on_request = null,
-            .log = true,
-            .max_clients = 1000,
-        },
-    );
-    defer listener.deinit();
+    try market.add_order(0, true, .{ .id = 0, .price = 200, .quantity = 100, .user_id = 100 });
 
-    var ep = zap.SimpleEndpoint.init(.{
-        .path = "/api",
-        .get = endpoint_http_api_get,
-    });
-    try listener.addEndpoint(&ep);
+    try market.add_order(0, true, .{ .id = 0, .price = 100, .quantity = 100, .user_id = 100 });
+    try market.add_order(0, false, .{ .id = 0, .price = 200, .quantity = 100, .user_id = 100 });
+    std.debug.print("{s}", .{market.to_json_pretty() catch return});
 
-    listener.listen() catch {};
+    _ = try market.markets.items[0].match_orders();
 
-    zap.start(.{
-        .threads = 1,
-        .workers = 1,
-    });
+    std.debug.print("{s}", .{market.to_json_pretty() catch return});
+
+    // // setup listener
+    // var listener = zap.SimpleEndpointListener.init(
+    //     alloc,
+    //     .{
+    //         .port = 3000,
+    //         .on_request = null,
+    //         .log = true,
+    //         .max_clients = 1000,
+    //     },
+    // );
+    // defer listener.deinit();
+
+    // var ep = zap.SimpleEndpoint.init(.{
+    //     .path = "/api",
+    //     .get = endpoint_http_api_get,
+    // });
+    // try listener.addEndpoint(&ep);
+
+    // listener.listen() catch {};
+
+    // zap.start(.{
+    //     .threads = 1,
+    //     .workers = 1,
+    // });
 }
