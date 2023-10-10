@@ -17,7 +17,8 @@ pub const Tokens = enum {
 };
 
 pub const Market = struct {
-    markets: std.ArrayList(Orderbook) = std.ArrayList(Orderbook).init(alloc),
+    markets: std.AutoHashMap(u32, Orderbook) = std.AutoHashMap(u32, Orderbook).init(alloc),
+    users: std.AutoHashMap(u64, User) = std.AutoHashMap(u64, User).init(alloc),
 
     pub fn to_json(self: Market) ![]const u8 {
         return json.toSlice(alloc, self);
@@ -27,12 +28,27 @@ pub const Market = struct {
         return json.toPrettySlice(alloc, self);
     }
 
-    pub fn add_orderbook(self: *Market, orderbook: Orderbook) !void {
-        return self.markets.append(orderbook);
+    pub fn create_orderbook(
+        self: *Market,
+        id: u32,
+        base: Tokens,
+        quote: Tokens,
+    ) !void {
+        return self.markets.put(id, Orderbook{ .id = id, .base = base, .quote = quote });
     }
 
     pub fn add_order(self: Market, m_id: u32, is_buy: bool, order: Order) !void {
-        return self.markets.items[m_id].add_order(is_buy, order);
+        if (self.markets.getPtr(m_id)) |ptr| {
+            return ptr.add_order(is_buy, order);
+        } else {
+            return;
+        }
+    }
+
+    pub fn create_user(self:Market, user_id: u64, pwd_hash: u64) !void {
+        var new_user = User{ .user_id = user_id, .pwd_hash = pwd_hash };
+        try new_user.balance.appendNTimes(0, Tokens.len);
+        return self.users.put(user_id, new_user);
     }
 };
 
@@ -140,18 +156,14 @@ pub const Order = struct {
     quantity: u64,
     price: u64,
     user_id: u64,
-
-    pub fn default() Order {
-        return .{
-            .id = 0,
-            .quantity = 0,
-            .price = 0,
-        };
-    }
 };
 
 pub const User = struct {
     user_id: u64,
     pwd_hash: u64,
-    balance: @Vector(4, i64) = @Vector(4, i64).init(alloc),
+    balance: std.ArrayList(i64) = std.ArrayList(i64).init(alloc),
+
+    pub fn to_json(self: *User) ![]const u8 {
+        return json.toSlice(alloc, .{ .user_id = self.user_id, .balance = self.balance });
+    }
 };
