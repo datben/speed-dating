@@ -40,6 +40,8 @@ pub fn main() !void {
 
     listener.listen() catch {};
 
+    std.debug.print("\nlisten on http://localhost:3000\n", .{});
+
     zap.start(.{
         .threads = 1,
         .workers = 1,
