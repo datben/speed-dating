@@ -17,6 +17,8 @@ pub fn main() !void {
     };
 
     try handler.market.create_orderbook(0, Tokens.A, Tokens.B);
+    try handler.market.create_orderbook(1, Tokens.A, Tokens.C);
+    try handler.market.create_orderbook(2, Tokens.C, Tokens.B);
 
     // setup listener
     var listener = zap.SimpleEndpointListener.init(

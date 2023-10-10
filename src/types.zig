@@ -17,10 +17,6 @@ pub const Tokens = enum {
         return @intFromEnum(self);
     }
 
-    pub fn from_int(i: u32) Tokens {
-        return @enumFromInt(i);
-    }
-
     pub fn all() [Tokens.len]Tokens {
         return .{ Tokens.A, Tokens.B, Tokens.C };
     }
@@ -33,10 +29,6 @@ pub const Market = struct {
 
     pub fn to_json(self: Market) ![]const u8 {
         return json.toSlice(alloc, .{ .tokens = self.tokens, .markets = self.markets });
-    }
-
-    pub fn to_json_pretty(self: Market) ![]const u8 {
-        return json.toPrettySlice(alloc, self);
     }
 
     pub fn create_orderbook(
