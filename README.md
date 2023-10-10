@@ -1,6 +1,6 @@
 # speed-dating
 
-Little marketplace 
+Little marketplace to trade with other people
 
 ## API
 
