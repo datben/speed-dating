@@ -12,7 +12,7 @@ pub fn main() !void {
         pub var market: types.Market = types.Market{};
 
         fn get(e: *zap.SimpleEndpoint, r: zap.SimpleRequest) void {
-            return endpoint.endpoint_http_api_get(market, e, r);
+            return endpoint.endpoint_http_api_get(&market, e, r);
         }
     };
 

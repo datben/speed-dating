@@ -1,7 +1,7 @@
 const std = @import("std");
 const zap = @import("zap");
 const json = @import("json");
-
+const ErrorSD = @import("./error.zig").ErrorSD;
 const alloc = std.heap.page_allocator;
 
 pub const Tokens = enum {
@@ -14,9 +14,18 @@ pub const Tokens = enum {
     pub fn to_int(self: Tokens) usize {
         return @intFromEnum(self);
     }
+
+    pub fn from_int(i: u32) Tokens {
+        return @enumFromInt(i);
+    }
+
+    pub fn all() [Tokens.len]Tokens {
+        return .{ Tokens.A, Tokens.B, Tokens.C };
+    }
 };
 
 pub const Market = struct {
+    tokens: [Tokens.len]Tokens = Tokens.all(),
     markets: std.AutoHashMap(u32, Orderbook) = std.AutoHashMap(u32, Orderbook).init(alloc),
     users: std.AutoHashMap(u64, User) = std.AutoHashMap(u64, User).init(alloc),
 
@@ -45,10 +54,19 @@ pub const Market = struct {
         }
     }
 
-    pub fn create_user(self:Market, user_id: u64, pwd_hash: u64) !void {
+    pub fn create_user(self: *Market, user_id: u64, pwd_hash: u64) !void {
         var new_user = User{ .user_id = user_id, .pwd_hash = pwd_hash };
-        try new_user.balance.appendNTimes(0, Tokens.len);
-        return self.users.put(user_id, new_user);
+        try new_user.balance.appendNTimes(100, Tokens.len);
+        try self.users.put(user_id, new_user);
+        return;
+    }
+
+    pub fn get_user(self: Market, user_id: u64) !*User {
+        if (self.users.getPtr(user_id)) |ptr| {
+            return ptr;
+        } else {
+            return ErrorSD.UserNotFound;
+        }
     }
 };
 
@@ -90,11 +108,10 @@ pub const Orderbook = struct {
         var users_updates = std.AutoHashMap(u64, std.ArrayList(i64)).init(alloc);
 
         while (can_match) {
-            const quantity_u64 = @min(best_buy_order.quantity, best_sell_order.quantity);
-            const quantity: i64 = @intCast(quantity_u64);
+            const quantity = @min(best_buy_order.quantity, best_sell_order.quantity);
 
-            best_buy_order.quantity -= quantity_u64;
-            best_sell_order.quantity -= quantity_u64;
+            best_buy_order.quantity -= quantity;
+            best_sell_order.quantity -= quantity;
             const matched_price: i64 = @intCast(match_price(best_buy_order.price, best_sell_order.price));
 
             // TODO : refactor to fn
@@ -153,8 +170,8 @@ fn cmp_order_price_desc(context: void, left: Order, right: Order) bool {
 
 pub const Order = struct {
     id: u64,
-    quantity: u64,
-    price: u64,
+    quantity: i64,
+    price: i64,
     user_id: u64,
 };
 
@@ -165,5 +182,21 @@ pub const User = struct {
 
     pub fn to_json(self: *User) ![]const u8 {
         return json.toSlice(alloc, .{ .user_id = self.user_id, .balance = self.balance });
+    }
+
+    pub fn add_balance_delta(self: *User, delta: std.ArrayList(i64)) void {
+        for (Tokens.len) |i| {
+            self.balance.items[i] += delta.items[i];
+        }
+    }
+
+    pub fn add_token_delta(self: *User, token: Tokens, delta: i64) !void {
+        if (delta < 0) {
+            if (self.balance.items[token.to_int()] < -delta) {
+                return ErrorSD.NotEnoughtToken;
+            }
+        } else {
+            self.balance.items[token.to_int()] += delta;
+        }
     }
 };
