@@ -18,3 +18,15 @@ pub fn parse_path(path: []const u8) !std.ArrayList([]const u8) {
     }
     return params;
 }
+
+pub const SHA2_DIGEST_LENGTH = std.crypto.hash.sha2.Sha256.digest_length;
+
+pub fn sha256(str: []const u8) !std.ArrayList(u8) {
+    var out: [SHA2_DIGEST_LENGTH]u8 = undefined;
+    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    hasher.update(str);
+    hasher.final(&out);
+    var res = std.ArrayList(u8).init(alloc);
+    try res.insertSlice(0, &out);
+    return res;
+}

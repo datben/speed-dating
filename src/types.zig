@@ -2,6 +2,8 @@ const std = @import("std");
 const zap = @import("zap");
 const json = @import("json");
 const ErrorSD = @import("./error.zig").ErrorSD;
+const utils = @import("./utils.zig");
+
 const alloc = std.heap.page_allocator;
 
 pub const Tokens = enum {
@@ -30,7 +32,7 @@ pub const Market = struct {
     users: std.AutoHashMap(u64, User) = std.AutoHashMap(u64, User).init(alloc),
 
     pub fn to_json(self: Market) ![]const u8 {
-        return json.toSlice(alloc, self);
+        return json.toSlice(alloc, .{ .tokens = self.tokens, .markets = self.markets });
     }
 
     pub fn to_json_pretty(self: Market) ![]const u8 {
@@ -54,9 +56,9 @@ pub const Market = struct {
         }
     }
 
-    pub fn create_user(self: *Market, user_id: u64, pwd_hash: u64) !void {
+    pub fn create_user(self: *Market, user_id: u32, pwd_hash: []const u8) !void {
         var new_user = User{ .user_id = user_id, .pwd_hash = pwd_hash };
-        try new_user.balance.appendNTimes(100, Tokens.len);
+        try new_user.balance.appendNTimes(10000, Tokens.len);
         try self.users.put(user_id, new_user);
         return;
     }
@@ -93,9 +95,9 @@ pub const Orderbook = struct {
         return @divFloor(buy + sell, 2);
     }
 
-    pub fn match_orders(self: *Orderbook) !?std.AutoHashMap(u64, std.ArrayList(i64)) {
+    pub fn match_orders(self: *Orderbook) !std.AutoHashMap(u64, std.ArrayList(i64)) {
         if ((self.buy.items.len == 0) or (self.sell.items.len == 0)) {
-            return null;
+            return std.AutoHashMap(u64, std.ArrayList(i64)).init(alloc);
         }
 
         std.sort.insertion(Order, self.buy.items, {}, cmp_order_price_asc);
@@ -118,24 +120,20 @@ pub const Orderbook = struct {
             var buy_entry = users_updates.getPtr(best_buy_order.user_id);
             if (buy_entry) |entry| {
                 entry.items[self.base.to_int()] += quantity;
-                entry.items[self.quote.to_int()] -= quantity * matched_price;
             } else {
                 var new_value = try std.ArrayList(i64).initCapacity(alloc, Tokens.len);
                 try new_value.appendNTimes(0, Tokens.len);
-                new_value.items[self.base.to_int()] = -quantity;
-                new_value.items[self.base.to_int()] = quantity * matched_price;
+                new_value.items[self.base.to_int()] = quantity;
                 try users_updates.put(best_buy_order.user_id, new_value);
             }
 
             var sell_entry = users_updates.getPtr(best_sell_order.user_id);
             if (sell_entry) |entry| {
-                entry.items[self.base.to_int()] -= quantity;
-                entry.items[self.quote.to_int()] += -quantity * matched_price;
+                entry.items[self.quote.to_int()] += quantity * matched_price;
             } else {
                 var new_value = try std.ArrayList(i64).initCapacity(alloc, Tokens.len);
                 try new_value.appendNTimes(0, Tokens.len);
-                new_value.items[self.base.to_int()] = -quantity;
-                new_value.items[self.base.to_int()] = quantity * matched_price;
+                new_value.items[self.quote.to_int()] = quantity * matched_price;
                 try users_updates.put(best_buy_order.user_id, new_value);
             }
 
@@ -151,7 +149,7 @@ pub const Orderbook = struct {
             } else {
                 best_buy_order = &self.buy.items[self.buy.items.len - 1];
                 best_sell_order = &self.buy.items[self.buy.items.len - 1];
-                can_match = best_buy_order.price < best_sell_order.price;
+                can_match = best_buy_order.price >= best_sell_order.price;
             }
         }
         return users_updates;
@@ -176,8 +174,8 @@ pub const Order = struct {
 };
 
 pub const User = struct {
-    user_id: u64,
-    pwd_hash: u64,
+    user_id: u32,
+    pwd_hash: []const u8,
     balance: std.ArrayList(i64) = std.ArrayList(i64).init(alloc),
 
     pub fn to_json(self: *User) ![]const u8 {
@@ -185,18 +183,20 @@ pub const User = struct {
     }
 
     pub fn add_balance_delta(self: *User, delta: std.ArrayList(i64)) void {
-        for (Tokens.len) |i| {
+        for (0..Tokens.len) |i| {
             self.balance.items[i] += delta.items[i];
         }
     }
 
     pub fn add_token_delta(self: *User, token: Tokens, delta: i64) !void {
-        if (delta < 0) {
-            if (self.balance.items[token.to_int()] < -delta) {
-                return ErrorSD.NotEnoughtToken;
-            }
+        if (delta < 0 and self.balance.items[token.to_int()] < -delta) {
+            return ErrorSD.NotEnoughtToken;
         } else {
             self.balance.items[token.to_int()] += delta;
         }
+    }
+
+    pub fn check_pwd(self: *User, pwd_hash: []u8) bool {
+        return std.mem.eql(u8, self.pwd_hash, pwd_hash);
     }
 };

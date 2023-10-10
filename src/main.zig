@@ -18,11 +18,6 @@ pub fn main() !void {
 
     try handler.market.create_orderbook(0, Tokens.A, Tokens.B);
 
-    try handler.market.add_order(0, true, .{ .id = 0, .price = 200, .quantity = 100, .user_id = 100 });
-
-    try handler.market.add_order(0, true, .{ .id = 0, .price = 100, .quantity = 100, .user_id = 100 });
-    try handler.market.add_order(0, false, .{ .id = 0, .price = 200, .quantity = 100, .user_id = 100 });
-
     // setup listener
     var listener = zap.SimpleEndpointListener.init(
         alloc,
