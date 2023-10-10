@@ -44,46 +44,48 @@ fn handle_create_user(market: *types.Market, e: *zap.SimpleEndpoint, r: zap.Simp
     _ = e;
     var rng = utils.RndGen();
     const id = rng.random().int(u64);
-    market.create_user(id, 1234) catch return err.send_error(r, 400, ErrorSD.InternalServerError) catch return;
-    return r.sendJson(json.toSlice(alloc, .{ .user_id = id }) catch return err.send_error(r, 400, ErrorSD.InternalServerError) catch return) catch return;
+    market.create_user(id, 1234) catch try err.send_error(r, 400, ErrorSD.InternalServerError);
+    return r.sendJson(json.toSlice(alloc, .{ .user_id = id }) catch return err.send_error(r, 400, ErrorSD.InternalServerError));
 }
 
 fn handle_get_balance(market: *types.Market, e: *zap.SimpleEndpoint, r: zap.SimpleRequest, user_params: [][]const u8) !void {
     _ = e;
-    const user_id = std.fmt.parseInt(u64, user_params[1], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest) catch return;
-    const user = market.get_user(user_id) catch return err.send_error(r, 400, ErrorSD.UserNotFound) catch return;
-    const user_json = user.to_json() catch return err.send_error(r, 400, ErrorSD.InternalServerError) catch return;
+    const user_id = std.fmt.parseInt(u64, user_params[1], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest);
+    const user = market.get_user(user_id) catch return err.send_error(r, 400, ErrorSD.UserNotFound);
+    const user_json = user.to_json() catch return err.send_error(r, 400, ErrorSD.InternalServerError);
     r.sendJson(user_json) catch return;
 }
 
 fn handle_place_order(market: *types.Market, e: *zap.SimpleEndpoint, r: zap.SimpleRequest, market_params: [][]const u8) !void {
     _ = e;
     var rng = utils.RndGen();
-    const market_id = std.fmt.parseInt(u32, market_params[0], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest) catch return;
+    const market_id = std.fmt.parseInt(u32, market_params[0], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest);
     if (market.markets.contains(market_id) == false) {
         return err.send_error(r, 400, ErrorSD.BadRequest) catch return;
     }
-    const current_market = market.markets.get(market_id).?;
+    const current_market = market.markets.getPtr(market_id).?;
 
-    const is_buy_int = std.fmt.parseInt(u8, market_params[1], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest) catch return;
-    const quantity = std.fmt.parseInt(i64, market_params[2], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest) catch return;
-    const price = std.fmt.parseInt(i64, market_params[3], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest) catch return;
+    const is_buy_int = std.fmt.parseInt(u8, market_params[1], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest);
+    const quantity = std.fmt.parseInt(i64, market_params[2], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest);
+    const price = std.fmt.parseInt(i64, market_params[3], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest);
 
     if (price < 0 or quantity < 0) {
         return err.send_error(r, 400, ErrorSD.BadRequest) catch return;
     }
 
-    const user_id = std.fmt.parseInt(u64, market_params[4], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest) catch return;
+    const user_id = std.fmt.parseInt(u64, market_params[4], 10) catch return err.send_error(r, 400, ErrorSD.BadRequest);
     const order_id = rng.random().int(u64);
     const is_buy = is_buy_int == 0;
     market.add_order(market_id, is_buy, .{ .id = order_id, .price = price, .quantity = quantity, .user_id = user_id }) catch return err.send_error(r, 400, ErrorSD.InternalServerError) catch return;
     const user = market.get_user(user_id) catch return err.send_error(r, 400, ErrorSD.InternalServerError) catch return;
 
     if (is_buy) {
-        user.add_token_delta(current_market.quote, -price * quantity) catch return err.send_error(r, 400, ErrorSD.NotEnoughtToken) catch return;
+        user.add_token_delta(current_market.quote, -price * quantity) catch return err.send_error(r, 400, ErrorSD.NotEnoughtToken);
     } else {
-        user.add_token_delta(current_market.base, -quantity) catch return err.send_error(r, 400, ErrorSD.NotEnoughtToken) catch return;
+        user.add_token_delta(current_market.base, -quantity) catch return err.send_error(r, 400, ErrorSD.NotEnoughtToken);
     }
 
-    r.sendJson(json.toSlice(alloc, .{ .order_id = order_id }) catch return err.send_error(r, 400, ErrorSD.InternalServerError) catch return) catch return;
+    const res = try current_market.match_orders();
+    _ = res;
+    return r.sendJson(json.toSlice(alloc, .{ .order_id = order_id }) catch return err.send_error(r, 400, ErrorSD.InternalServerError));
 }

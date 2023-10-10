@@ -89,8 +89,8 @@ pub const Orderbook = struct {
         }
     }
 
-    pub fn match_price(buy: u64, sell: u64) u64 {
-        return (buy + sell) / 2;
+    pub fn match_price(buy: i64, sell: i64) i64 {
+        return @divFloor(buy + sell, 2);
     }
 
     pub fn match_orders(self: *Orderbook) !?std.AutoHashMap(u64, std.ArrayList(i64)) {
@@ -112,7 +112,7 @@ pub const Orderbook = struct {
 
             best_buy_order.quantity -= quantity;
             best_sell_order.quantity -= quantity;
-            const matched_price: i64 = @intCast(match_price(best_buy_order.price, best_sell_order.price));
+            const matched_price = match_price(best_buy_order.price, best_sell_order.price);
 
             // TODO : refactor to fn
             var buy_entry = users_updates.getPtr(best_buy_order.user_id);
