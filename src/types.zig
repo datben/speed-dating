@@ -112,10 +112,12 @@ pub const Orderbook = struct {
             var buy_entry = users_updates.getPtr(best_buy_order.user_id);
             if (buy_entry) |entry| {
                 entry.items[self.base.to_int()] += quantity;
+                entry.items[self.quote.to_int()] += quantity * (best_buy_order.price - matched_price);
             } else {
                 var new_value = try std.ArrayList(i64).initCapacity(alloc, Tokens.len);
                 try new_value.appendNTimes(0, Tokens.len);
                 new_value.items[self.base.to_int()] = quantity;
+                new_value.items[self.quote.to_int()] = quantity * (best_buy_order.price - matched_price);
                 try users_updates.put(best_buy_order.user_id, new_value);
             }
 
